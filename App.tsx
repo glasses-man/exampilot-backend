@@ -140,20 +140,6 @@ const TRANSLATIONS = {
 }
 
 // Mock data
-const mockUser: User = {
-  id: 'demo-user',
-  email: 'student@demo.com',
-  name: 'Demo Student',
-  tier: 'free',
-  daily_questions: 2,
-  total_questions: 15,
-  streak: 3,
-  last_active: new Date().toISOString(),
-  xp: 450,
-  level: 3,
-  badges: ['first_question', 'streak_3', 'questions_10'],
-  preferred_language: 'en'
-}
 
 const mockLeaderboard: LeaderboardEntry[] = [
   { rank: 1, name: 'Ahmed K.', xp: 2500, level: 8, streak: 12 },
@@ -163,21 +149,6 @@ const mockLeaderboard: LeaderboardEntry[] = [
   { rank: 5, name: 'Lina R.', xp: 320, level: 2, streak: 2 },
 ]
 
-// Google Auth Helper
-const initGoogleAuth = () => {
-  return new Promise<void>((resolve) => {
-    if ((window as any).google) {
-      resolve()
-      return
-    }
-    const script = document.createElement('script')
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.defer = true
-    script.onload = () => resolve()
-    document.head.appendChild(script)
-  })
-}
 
 // Main App Component
 function App() {
@@ -186,7 +157,6 @@ function App() {
   const [currentView, setCurrentView] = useState<'landing' | 'auth' | 'dashboard'>('landing')
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
   const [language, setLanguage] = useState<'en' | 'ar'>('en')
-  const googleBtnRef = useRef<HTMLDivElement>(null)
 
   const t = TRANSLATIONS[language]
 
@@ -203,64 +173,52 @@ function App() {
     }
   }, [])
 
-  // Initialize Google Auth
-  useEffect(() => {
-    if (currentView === 'auth') {
-      initGoogleAuth().then(() => {
-        if ((window as any).google && googleBtnRef.current) {
-          (window as any).google.accounts.id.initialize({
-            client_id: 'YOUR_GOOGLE_CLIENT_ID', // Replace with your Google Client ID
-            callback: handleGoogleCallback,
-          })
-          ;(window as any).google.accounts.id.renderButton(googleBtnRef.current, {
-            theme: 'outline',
-            size: 'large',
-            width: '100%',
-          })
-        }
-      })
-    }
-  }, [currentView])
 
-  const handleGoogleCallback = (response: any) => {
-    // Decode JWT to get user info
-    const payload = JSON.parse(atob(response.credential.split('.')[1]))
-    const newUser = {
-      ...mockUser,
-      email: payload.email,
-      name: payload.name,
-      id: payload.sub,
-    }
-    const mockToken = 'google-token-' + Date.now()
-    setUser(newUser)
-    setToken(mockToken)
-    localStorage.setItem('exampilot_token', mockToken)
-    localStorage.setItem('exampilot_user', JSON.stringify(newUser))
-    setCurrentView('dashboard')
-    toast.success(`Welcome, ${payload.name}!`)
-  }
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const mockToken = 'demo-token-' + Date.now()
-    setUser(mockUser)
-    setToken(mockToken)
-    localStorage.setItem('exampilot_token', mockToken)
-    localStorage.setItem('exampilot_user', JSON.stringify(mockUser))
+    const form = e.target as HTMLFormElement
+    const emailVal = (form.querySelector('input[type="email"]') as HTMLInputElement)?.value
+    const passwordVal = (form.querySelector('input[type="password"]') as HTMLInputElement)?.value
+    const allUsers = JSON.parse(localStorage.getItem('exampilot_users') || '{}')
+    const existingUser = allUsers[emailVal]
+    if (!existingUser) { toast.error('No account found. Please sign up first.'); return }
+    if (existingUser.password !== passwordVal) { toast.error('Wrong password. Try again.'); return }
+    const token = 'token-' + Date.now()
+    const { password: _p, ...safeUser } = existingUser
+    setUser(safeUser)
+    setToken(token)
+    localStorage.setItem('exampilot_token', token)
+    localStorage.setItem('exampilot_user', JSON.stringify(safeUser))
     setCurrentView('dashboard')
     toast.success(t.welcome)
   }
 
   const handleSignup = async (e: React.FormEvent, nameVal: string) => {
     e.preventDefault()
-    const newUser = { ...mockUser, name: nameVal }
-    const mockToken = 'demo-token-' + Date.now()
+    const form = e.target as HTMLFormElement
+    const emailVal = (form.querySelector('input[type="email"]') as HTMLInputElement)?.value
+    const passwordVal = (form.querySelector('input[type="password"]') as HTMLInputElement)?.value
+    if (!emailVal || !passwordVal || !nameVal) { toast.error('Please fill in all fields.'); return }
+    if (passwordVal.length < 6) { toast.error('Password must be at least 6 characters.'); return }
+    const allUsers = JSON.parse(localStorage.getItem('exampilot_users') || '{}')
+    if (allUsers[emailVal]) { toast.error('Email already registered. Please log in.'); return }
+    const newUser: User = {
+      id: 'user-' + Date.now(), email: emailVal, name: nameVal, tier: 'free',
+      daily_questions: 0, total_questions: 0, streak: 0,
+      last_active: new Date().toISOString(), xp: 0, level: 1, badges: [],
+      preferred_language: 'en'
+    }
+    allUsers[emailVal] = { ...newUser, password: passwordVal }
+    localStorage.setItem('exampilot_users', JSON.stringify(allUsers))
+    const token = 'token-' + Date.now()
     setUser(newUser)
-    setToken(mockToken)
-    localStorage.setItem('exampilot_token', mockToken)
+    setToken(token)
+    localStorage.setItem('exampilot_token', token)
     localStorage.setItem('exampilot_user', JSON.stringify(newUser))
     setCurrentView('dashboard')
-    toast.success('Account created!')
+    toast.success('Account created! Welcome to ExamPilot!')
   }
 
   const handleLogout = () => {
@@ -300,7 +258,6 @@ function App() {
           setCurrentView={setCurrentView}
           handleLogin={handleLogin}
           handleSignup={handleSignup}
-          googleBtnRef={googleBtnRef as React.RefObject<HTMLDivElement>}
           language={language}
           toggleLanguage={toggleLanguage}
           t={t}
@@ -545,7 +502,6 @@ function AuthPage({
   setCurrentView,
   handleLogin,
   handleSignup,
-  googleBtnRef,
   language,
   toggleLanguage,
   t
@@ -555,7 +511,6 @@ function AuthPage({
   setCurrentView: (v: 'landing' | 'auth' | 'dashboard') => void
   handleLogin: (e: React.FormEvent) => void
   handleSignup: (e: React.FormEvent, name: string) => void
-  googleBtnRef: React.RefObject<HTMLDivElement | null>
   language: 'en' | 'ar'
   toggleLanguage: () => void
   t: typeof TRANSLATIONS.en
@@ -587,8 +542,7 @@ function AuthPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Google Sign In */}
-          <div ref={googleBtnRef} className="mb-4"></div>
+
           
           <div className="relative my-4">
             <div className="absolute inset-0 flex items-center">
@@ -740,9 +694,9 @@ Make it encouraging and clear.${language === 'ar' ? ' Write the entire response 
         },
         body: JSON.stringify({
           question: prompt,
-          subject: selectedSubject,
+          subject: subject,
           language: language === 'ar' ? 'arabic' : 'english',
-          user_id: user?.id || 'anonymous'
+          user_id: 'user'
         })
       })
 
@@ -751,7 +705,7 @@ Make it encouraging and clear.${language === 'ar' ? ' Write the entire response 
       }
 
       const data = await response.json()
-      return data.explanation || data.answer || data.content
+      return data.explanation || data.answer || data.content || data.text
     } catch (error) {
       console.error('OpenAI error:', error)
       // Fallback response
