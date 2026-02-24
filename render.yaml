@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: exampilot-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: OPENAI_API_KEY
+        value: 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
+    plan: free
