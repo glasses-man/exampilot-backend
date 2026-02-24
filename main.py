@@ -159,7 +159,7 @@ def parse_explanation(text: str) -> dict:
     for line in lines:
         line = line.strip()
         if line.startswith('STEP'):
-            steps.append(line.split(':', 1)[1].strip() if ':' in line else line)
+            steps.append(line.replace(/^STEP \d+:\s*/, '', 1) if hasattr(line, 'replace') else line.split(':', 1)[1].strip() if ':' in line else line)
         elif line.startswith('FINAL ANSWER:'):
             final_answer = line.replace('FINAL ANSWER:', '').strip()
     
@@ -267,6 +267,25 @@ def root():
         "message": "ExamPilot API - AI Exam Coach",
         "version": "1.0.0",
         "status": "running"
+    }
+
+
+class ExplainRequest(BaseModel):
+    question: str
+    subject: str = "math"
+    language: str = "english"
+
+@app.post("/explain")
+async def explain_question(req: ExplainRequest):
+    """Public endpoint - no auth required"""
+    ai_response = await call_openai(req.subject, req.question, req.language)
+    if not ai_response:
+        ai_response = """STEP 1: Read the question carefully\nSTEP 2: Identify key concepts\nSTEP 3: Apply method step by step\nSTEP 4: Verify your answer\n\nFINAL ANSWER: Check steps above."""
+    parsed = parse_explanation(ai_response)
+    return {
+        "explanation": ai_response,
+        "steps": parsed["steps"],
+        "final_answer": parsed["final_answer"]
     }
 
 @app.get("/health")
