@@ -159,7 +159,7 @@ def parse_explanation(text: str) -> dict:
     for line in lines:
         line = line.strip()
         if line.startswith('STEP'):
-            steps.append(line.replace(/^STEP \d+:\s*/, '', 1) if hasattr(line, 'replace') else line.split(':', 1)[1].strip() if ':' in line else line)
+            steps.append(line.split(':', 1)[1].strip() if ':' in line else line)
         elif line.startswith('FINAL ANSWER:'):
             final_answer = line.replace('FINAL ANSWER:', '').strip()
     
